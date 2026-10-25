@@ -1,407 +1,382 @@
-# Railway Track Health Intelligence System
+# InfeRail — Railway Track Health Intelligence System
 
-## Project Overview
-
-**Project duration:** 2 weeks  
-**Team size:** 6 members  
-**Goal:** Build a working prototype that analyzes railway-track images, detects possible defects, assigns a preliminary priority category, stores inspection results, and displays them in a dashboard.
-
-### Prototype workflow
-
-1. User uploads a railway-track image.
-2. The image is processed by a computer-vision model.
-3. The model returns any detected defect classes, bounding boxes, and confidence scores.
-4. A rule-based component assigns a **preliminary** low, medium, or high priority.
-5. The inspection record is saved to a local SQLite database.
-6. The dashboard displays the annotated image, detections, summary statistics, and inspection history.
-
-> **Safety note:** This is an academic prototype, not a certified railway inspection system. Model confidence is not the same as defect severity. Priority rules must be documented as illustrative and must not be used to make real-world railway safety decisions.
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Framework](https://img.shields.io/badge/UI-Streamlit-FF4B4B.svg)](https://streamlit.io/)
+[![Vision](https://img.shields.io/badge/Computer_Vision-YOLOv8%20%7C%20OpenCV-green.svg)](https://ultralytics.com/)
+[![Database](https://img.shields.io/badge/Database-SQLite-003B57.svg)](https://www.sqlite.org/)
 
 ---
 
-## 1. Team Responsibilities
+## 1. Project Explanation & Overview
 
-Each member owns a component, but all members are expected to help with integration and testing.
+### 1.1 Problem Statement
+Railway tracks are subject to heavy continuous dynamic mechanical loads, temperature variations, and environmental stress. Over time, these conditions cause various surface and structural track defects, such as:
+- **Surface Cracks / Fractures** on the rail head
+- **Missing or Broken Fasteners / Clips / Tie Plates**
+- **Ballast Degradation & Voiding**
+- **Fishplate / Joint Failures**
+- **Squats, Spalling, and Shelling**
 
-### Member 1 — AI Model and Defect Detection
+Traditional track inspection relies heavily on manual foot patrols and periodic specialized inspection cars. Manual inspection is slow, hazardous to personnel, qualitative, prone to human fatigue, and hard to audit at scale.
 
-**Main objective:** Make the model detect the selected railway-track defect categories on sample images.
+### 1.2 Proposed Solution: InfeRail
+**InfeRail** is an intelligent, automated inspection prototype that uses computer vision and automated prioritization to detect railway track defects from uploaded track imagery (and video frames), estimate defect severity, persist inspection records to an auditable database, and visualize health trends on a maintenance dashboard.
 
-Tasks:
-- Find and run a suitable pretrained model.
-- Select a dataset/model appropriate for the chosen defect categories.
-- Build an inference function that accepts an image and returns detections.
-- Return defect class, confidence score, and bounding-box coordinates when available.
-- Save or return an annotated image for display.
-- Test on multiple images, including examples where no defect is detected.
-- Document model limitations and required model weights.
-
-**Deliverables:**
-- `detection/detector.py`
-- Model weights or clear instructions for obtaining them
-- Example predictions and annotated images
-- Notes on the model and its limitations
-
-**Handoff:** Provide a documented function/interface to Members 2, 5, and 6.
-
-### Member 2 — Dataset, Image Processing, and Evaluation
-
-**Main objective:** Ensure the team uses suitable data and evaluates model results honestly.
-
-Tasks:
-- Find and document a suitable railway defect dataset.
-- Confirm what each label means and whether annotations are available.
-- Organize train/validation/test data if model fine-tuning is feasible.
-- Use OpenCV for necessary image loading, resizing, or preprocessing.
-- Keep evaluation images separate from training data where applicable.
-- Help Member 1 test and improve inference.
-- Calculate appropriate metrics when ground-truth labels are available, such as precision, recall, and F1 score.
-- Record false positives, false negatives, and difficult cases.
-
-**Deliverables:**
-- Dataset source and usage notes
-- Organized sample/test images
-- Evaluation summary and representative failure cases
-- `dataset/README.md` or equivalent documentation
-
-**Handoff:** Provide a small, reliable test set to the whole team. Do not commit large datasets to Git unless the team has agreed to do so.
-
-### Member 3 — Database and Inspection Records
-
-**Main objective:** Store and retrieve inspection results.
-
-Tasks:
-- Set up SQLite.
-- Create a table for inspection records.
-- Store image filename/reference, inspection date/time, detected class, confidence, preliminary priority, and any available bounding-box data.
-- Implement functions to initialize the database, save records, and retrieve inspection history.
-- Handle missing or invalid values safely.
-- Test that saved records remain available after restarting the app.
-
-**Deliverables:**
-- `database/db.py`
-- Database schema documentation
-- Working save/retrieve functions
-
-**Handoff:** Agree on function names and record fields with Members 4 and 6 before integration.
-
-### Member 4 — User Interface and Dashboard
-
-**Main objective:** Make the prototype easy to demonstrate and use.
-
-Tasks:
-- Build a Streamlit interface.
-- Add image upload and a button to run detection.
-- Display the original and annotated images.
-- Show detected classes, confidence scores, and preliminary priority labels.
-- Display inspection history from SQLite.
-- Add simple summary statistics, such as the number of inspections and detections by category.
-- Handle unsupported files and model/database errors with clear messages.
-
-**Deliverables:**
-- `app.py` and/or `dashboard/components.py`
-- Working upload/results/history screens
-- Simple instructions for launching the app
-
-**Handoff:** Coordinate with Members 1, 3, and 5 so the dashboard uses their actual functions and data.
-
-### Member 5 — Severity Rules and Maintenance Prioritization
-
-**Main objective:** Add a transparent, explainable preliminary priority category.
-
-Tasks:
-- Agree with the team on the defect categories the prototype supports.
-- Design simple, documented rules for low, medium, and high priority.
-- Use only information the prototype actually has, such as defect class and any validated measurements.
-- Do not treat the model confidence score alone as a measure of severity.
-- Provide a function that accepts a detection and returns a priority category plus a short explanation.
-- Test the rules on example detections.
-- Document that the rules are illustrative and require expert validation before any real-world use.
-
-**Deliverables:**
-- `prioritization/severity.py`
-- Written explanation of the rules and their limitations
-- Example inputs and outputs
-
-**Handoff:** Agree on input/output fields with Members 1 and 3.
-
-### Member 6 — Integration, Testing, and Project Coordination
-
-**Main objective:** Keep the project organized and ensure all components work together.
-
-Tasks:
-- Create and maintain the shared GitHub repository and folder structure.
-- Add a `.gitignore` and shared dependency list.
-- Agree on interfaces and data formats with all members early.
-- Ensure each member can run and test their component independently.
-- Integrate detection, prioritization, storage, and dashboard.
-- Run end-to-end tests and track bugs.
-- Keep a known-good sample image and backup annotated outputs for the demo.
-- Maintain the README and prepare the final demo checklist.
-
-**Deliverables:**
-- Repository structure and integration instructions
-- `requirements.txt`
-- `tests/test_workflow.py` or an equivalent test checklist
-- Working end-to-end demo
-- Final README and demo plan
-
-**Important:** Member 6 coordinates integration but is not the only person responsible for it. Each component owner must help debug their own component.
-
----
-
-## 2. Suggested Repository Structure
-
-```text
-railway-track-health/
-├── app.py
-├── requirements.txt
-├── README.md
-├── .gitignore
-├── config.py
-├── detection/
-│   ├── __init__.py
-│   └── detector.py
-├── dataset/
-│   └── README.md
-├── database/
-│   ├── __init__.py
-│   └── db.py
-├── dashboard/
-│   └── components.py
-├── prioritization/
-│   ├── __init__.py
-│   └── severity.py
-├── tests/
-│   └── test_workflow.py
-├── uploads/
-└── outputs/
+### 1.3 Core Workflow
+```mermaid
+flowchart LR
+    A[Track Image Upload] --> B[Image Preprocessing & Validation\n(Team 1)]
+    B --> C[AI Defect Detection Model\n(Team 1)]
+    C --> D[Severity & Priority Rules\n(Team 2)]
+    D --> E[Inspection Database Persistence\n(Team 2)]
+    E --> F[Interactive Web Dashboard\n(Team 3)]
+    F --> G[Alerts & PDF/CSV Export\n(Team 3)]
 ```
 
-The exact structure may change during implementation. Keep imports consistent and update this README if the structure changes.
+1. **Ingestion & Preprocessing:** User uploads high-resolution track images (or video frame captures). The image is validated, normalized, and preprocessed.
+2. **Defect Detection (AI Pipeline):** A trained computer-vision model (YOLOv8 / YOLOv11) inspects the frame to detect defect instances, providing bounding boxes, class labels, and confidence metrics.
+3. **Severity & Priority Classification:** A rule-based domain engine converts raw detection metrics into actionable maintenance priority ratings (`Low`, `Medium`, `High`, `Critical`) with plain-language diagnostic rationales.
+4. **Data Persistence:** The complete inspection event (timestamp, image path, detected defects, bounding boxes, priority ratings, and reasonings) is stored in a queryable SQLite database.
+5. **Dashboard & Maintenance Insights:** Maintenance teams view annotated inspection images, filter past inspections, examine track health distribution, and export inspection logs.
 
-### Git and file hygiene
-
-- Use feature branches or small pull requests when possible.
-- Commit source code and documentation.
-- Avoid committing large datasets, model weights, private files, or generated outputs unless agreed.
-- Add environment folders, database files, caches, and large data files to `.gitignore` as appropriate.
-- Never commit passwords, API keys, or other secrets.
+> **Safety Notice:** InfeRail is an academic and operational prototype designed for decision-support and assistive screening. It is not certified for autonomous track certification without human oversight.
 
 ---
 
-## 3. Shared Data Contract
+## 2. Recommended Tech Stack
 
-Agree on a common format before separate components are built. The following is an illustrative single-detection record; values are examples, not model output.
+| Layer | Recommended Technology | Why This Tech Stack Was Chosen |
+|---|---|---|
+| **Programming Language** | **Python 3.10+ / 3.11** | Industry standard for AI, Computer Vision, and rapid prototype engineering. High ecosystem compatibility. |
+| **Object Detection & CV** | **Ultralytics YOLOv8 / YOLOv11** | State-of-the-art balance of high inference speed (real-time capable), strong accuracy on small defects, native support for bounding box annotations, and easy custom fine-tuning. |
+| **Image Preprocessing** | **OpenCV (`opencv-python`) & Pillow** | Fast image loading, resizing, normalization, contrast enhancement (CLAHE for varying track lighting), and bounding box drawing. |
+| **Data Augmentation & Metrics** | **Albumentations & Scikit-learn** | Synthetic augmentation (blur, glare, shadow, angle tilt) to build a robust model; standard evaluation metrics (Precision, Recall, mAP@50-95, F1-score). |
+| **Database & Persistence** | **SQLite + SQLAlchemy / sqlite3** | Zero-configuration, serverless, self-contained, file-based SQL database ideal for rapid 2-week prototyping, seamless Git setup, and instant reproducibility. |
+| **Data Schema Validation** | **Pydantic (v2)** | Guarantees strict data contracts between the AI pipeline, database, and UI layers, avoiding runtime interface bugs. |
+| **Frontend & Visualization** | **Streamlit** | Rapid development of modern, responsive data dashboards in pure Python. Provides native file uploaders, image rendering, interactive data tables, and metrics widgets without complex frontend build tools. |
+| **Analytics & Plotting** | **Plotly / Altair** | Interactive charts for defect distribution by category, timeline trends, and severity heatmaps. |
+| **Testing & Quality Assurance** | **Pytest** | Automated unit tests for detection format, priority rules, database CRUD operations, and end-to-end integration. |
+| **Environment & Git Management** | **venv / uv + GitHub** | Clean virtual environment isolation and git-based branch workflows. |
 
+---
+
+## 3. Team Structure & Work Division (3 Teams of 2 Members)
+
+The project workload is structured into **3 specialized two-person teams**. Each team owns a core pillar of the architecture with clear interfaces and deliverables:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        InfeRail Project Team                           │
+├────────────────────┬────────────────────┬──────────────────────────────┤
+│       Team 1       │       Team 2       │            Team 3            │
+│ Computer Vision &  │ Data Persistence & │   Web Dashboard, System      │
+│   AI Pipeline      │ Prioritization     │    Integration & QA          │
+│ (Members 1 & 2)    │ (Members 3 & 4)    │      (Members 5 & 6)         │
+└────────────────────┴────────────────────┴──────────────────────────────┘
+```
+
+---
+
+### Team 1: Computer Vision & AI Pipeline
+**Members:** Member 1 (AI Lead) & Member 2 (Data & Evaluation Engineer)  
+**Primary Focus:** Model training/inference, dataset curation, image preprocessing, and performance benchmarking.
+
+#### Member 1 — AI Model Lead & Inference Engine
+- **Core Tasks:**
+  - Select and set up the detection architecture (e.g., YOLOv8n / YOLOv8s for speed and reliability).
+  - Train or fine-tune the model on railway track defect categories (cracks, missing fasteners, defective joints, spalling).
+  - Develop `detection/detector.py`: clean inference function taking an image (or path) and outputting standardized detections (bounding boxes, class names, confidence scores).
+  - Implement visualization helper to render professional bounding boxes with color-coded classes on output images.
+  - Document model weights, inference latency, and hardware prerequisites.
+- **Deliverables:**
+  - `detection/detector.py`
+  - Model weights file (e.g., `models/best.pt`) and download/export script
+  - Annotated output image generator
+  - Inference unit test script
+
+#### Member 2 — Dataset Curation, Preprocessing & Evaluation
+- **Core Tasks:**
+  - Source and curate track defect datasets (e.g., RSDDs, Rail Surface Defect Database, NEU surface defects, or open Roboflow railway datasets).
+  - Validate image annotations (YOLO format), split into clean train/val/test partitions (e.g., 70/15/15).
+  - Implement preprocessing and augmentation in `detection/preprocessing.py` (contrast adjustment, CLAHE for outdoor track shadows/glare, resizing).
+  - Formulate a test set of challenging real-world edge cases (clean track, rust, shadow vs. real crack, nighttime/low-light).
+  - Compute model metrics: mAP@50, mAP@50-95, Precision, Recall, and Confusion Matrix.
+- **Deliverables:**
+  - `dataset/README.md` (data dictionary, sources, license, and download links)
+  - Curated test set directory (`dataset/sample_test_images/`)
+  - Evaluation report summarizing accuracy and failure modes (false positives & false negatives)
+  - Preprocessing pipeline modules
+
+**Team 1 Handoff Contract:** Team 1 provides `detect_defects(image_input) -> Tuple[List[DetectionResult], np.ndarray]` to Teams 2 and 3.
+
+---
+
+### Team 2: Data Persistence & Prioritization Engine
+**Members:** Member 3 (Backend & Database Engineer) & Member 4 (Domain Logic & Severity Specialist)  
+**Primary Focus:** Relational data storage, historical inspection queries, rule-based maintenance severity assessment, and data integrity.
+
+#### Member 3 — Database Architecture & CRUD Service
+- **Core Tasks:**
+  - Design normalized SQLite schema in `database/db.py` handling two primary tables:
+    1. `inspections`: session metadata (ID, timestamp, image name, overall severity, inspector notes).
+    2. `defects`: detected instances (defect ID, inspection ID foreign key, defect type, confidence, bounding box coordinates, assigned priority).
+  - Implement database helper methods: `init_db()`, `save_inspection_record()`, `get_all_inspections()`, `get_inspection_details(id)`, and `filter_inspections_by_severity()`.
+  - Ensure safe database transactions, handle missing values, and test database persistence across app restarts.
+  - Provide seed data script (`database/seed_data.py`) for offline dashboard testing.
+- **Deliverables:**
+  - `database/schema.sql` and `database/db.py`
+  - Database unit tests verifying save and query operations
+  - Seed script with mock historical inspections
+
+#### Member 4 — Severity Rules & Maintenance Prioritization Engine
+- **Core Tasks:**
+  - Design transparent, deterministic domain rules for railway maintenance in `prioritization/severity.py`.
+  - Categorize priority into four tiers:
+    - **CRITICAL:** Immediate derailment risk (e.g., broken rail, missing multiple consecutive fasteners).
+    - **HIGH:** Significant track defect requiring rapid maintenance (e.g., wide surface crack, broken fishplate).
+    - **MEDIUM:** Developing defect requiring scheduled inspection (e.g., minor spalling, light surface wear).
+    - **LOW / MONITOR:** Cosmetic surface flaw or superficial rust.
+  - Formulate multi-defect rollup logic: if an image contains both a minor crack and a missing fastener, determine the overall inspection priority.
+  - Generate clear, human-readable explanations (e.g., *"Assigned HIGH: Defect type 'Broken Fastener' exceeds threshold of single-point retention tolerance"*).
+  - Explicitly document that confidence score is not severity (a high-confidence minor scratch is still Low severity).
+- **Deliverables:**
+  - `prioritization/severity.py`
+  - Priority rule decision table and logic documentation
+  - Comprehensive unit tests covering various combinations of defect types and counts
+
+**Team 2 Handoff Contract:** Team 2 provides `evaluate_priority(detections) -> PriorityReport` and `save_inspection(record) -> int` to Team 3.
+
+---
+
+### Team 3: Web Dashboard, System Integration & QA
+**Members:** Member 5 (UI/UX & Dashboard Engineer) & Member 6 (System Integration & QA Lead)  
+**Primary Focus:** Interactive user interface, end-to-end integration, error handling, automated testing, and release coordination.
+
+#### Member 5 — Interactive Web Dashboard & Visualization
+- **Core Tasks:**
+  - Build modern, intuitive multi-page or tabbed UI in `app.py` using Streamlit:
+    - **Tab 1: Live Track Inspection:** File uploader (JPG/PNG), "Run Inspection" action, side-by-side original vs. annotated image, summary cards for detected defects and overall priority badge.
+    - **Tab 2: Inspection History & Audit Log:** Searchable, sortable table of past inspections, filter by date range, defect category, or priority level, with clickable records.
+    - **Tab 3: Track Health Analytics:** Aggregated visual charts (Plotly) showing defect distributions, monthly severity trends, and top recurring defect locations.
+    - **Tab 4: Export & Reporting:** Download inspection reports as CSV or formatted PDF summary.
+  - Implement responsive loading states, error banners, and empty-state messages ("No defects detected by the model; track segment is visually clear").
+- **Deliverables:**
+  - `app.py` and `dashboard/components.py`
+  - Interactive charts and inspection detail view
+  - Export utilities (CSV / PDF)
+
+#### Member 6 — System Integration, QA & Project Lead
+- **Core Tasks:**
+  - Establish GitHub repository standards: branching strategy (`feature/*`), `.gitignore`, and `requirements.txt`.
+  - Maintain the unified pipeline glue code connecting Team 1 (Detection), Team 2 (Severity + DB), and Team 3 (Dashboard).
+  - Write end-to-end integration tests (`tests/test_integration.py`) validating the pipeline from dummy image input to database record retrieval.
+  - Implement graceful exception handling for corrupted images, missing model weights, and database locks.
+  - Lead daily 15-minute standups, monitor blockers, enforce timeline milestones, and prepare demo rehearsal.
+- **Deliverables:**
+  - Repository configuration, `requirements.txt`, and setup documentation
+  - `tests/test_integration.py` test suite
+  - Live demo plan, sample test assets, and backup slide deck/recording
+
+**Team 3 Handoff Contract:** Delivers the packaged, runnable application with documentation and verified end-to-end stability.
+
+---
+
+## 4. Shared Data Contract
+
+To allow all three teams to work independently without merge blockers, the data contract between modules is defined using Python dictionaries / Pydantic models:
+
+### 4.1 Defect Detection Result (Team 1 Output -> Teams 2 & 3 Input)
 ```python
 {
-    "image_name": "track_001.jpg",
-    "defect_type": "crack",
-    "confidence": 0.91,
-    "severity": "medium",
-    "inspection_date": "2026-10-25"
+    "defect_id": 1,
+    "class_name": "crack",               # "crack", "missing_fastener", "broken_rail", "joint_defect"
+    "confidence": 0.89,                   # float between 0.0 and 1.0
+    "bbox": [120, 245, 380, 410],        # [x_min, y_min, x_max, y_max] normalized or pixel coords
+    "area_pixels": 42900                 # estimated area (optional)
 }
 ```
 
-Recommended fields:
-
-| Field | Meaning |
-|---|---|
-| `inspection_id` | Unique ID for the inspection record |
-| `image_name` | Original uploaded image filename or stored reference |
-| `defect_type` | Model-predicted class |
-| `confidence` | Model confidence, if available |
-| `bbox` | Bounding-box coordinates, if available |
-| `severity` | Preliminary priority category from documented rules |
-| `priority_reason` | Short explanation of the assigned category |
-| `inspection_date` | Date/time the inspection was run |
-
-An image may contain zero, one, or multiple detections. The team should decide whether to store one row per inspection with detections in a related table, or one row per detection. For a small prototype, one row per detection plus a shared inspection ID is a practical approach.
-
-### Suggested interfaces
-
-- **Member 1:** `detect_image(image) -> detections, annotated_image`
-- **Member 3:** `init_db()`, `save_inspection(record)`, `get_inspection_history()`
-- **Member 5:** `assign_priority(detection) -> priority, reason`
-- **Member 4:** calls the above functions from the UI
-- **Member 6:** verifies the integrated flow and documents how to run it
-
-These are suggested interface names; the team may change them, but changes should be communicated to everyone.
-
----
-
-## 4. End-to-End Workflow
-
-```mermaid
-flowchart TD
-    A[User uploads railway image] --> B[Validate and load image]
-    B --> C[Run defect detection model]
-    C --> D[Return classes, boxes, confidence]
-    D --> E[Assign preliminary priority]
-    E --> F[Save inspection and detections in SQLite]
-    F --> G[Show annotated image and results]
-    F --> H[Update inspection history and summaries]
+### 4.2 Priority Evaluation Result (Team 2 Output -> Teams 2 & 3 Input)
+```python
+{
+    "overall_priority": "HIGH",           # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    "defect_priorities": [
+        {
+            "class_name": "crack",
+            "priority": "HIGH",
+            "reason": "Surface fracture length exceeds standard tolerance threshold"
+        }
+    ],
+    "action_recommendation": "Dispatch maintenance crew for ultrasound inspection within 24 hours."
+}
 ```
 
-### Expected behavior
-
-1. Validate the uploaded file and show a useful error if it cannot be read.
-2. Run inference and display the results.
-3. If there are no detections, show “No defects detected by the model” rather than implying the track is safe.
-4. Assign priority only using documented rules and available evidence.
-5. Save the inspection and its detections.
-6. Show the saved record in the dashboard history.
-7. If any step fails, show an error and avoid saving misleading or incomplete records.
-
----
-
-## 5. Two-Week Schedule
-
-### Days 1–2 — Setup and first working components
-
-**Everyone**
-- Install Python and agree on the Python version.
-- Clone the repository and verify the environment.
-- Review the shared data format and interfaces.
-
-**Member 1:** Run the model on at least one sample image.  
-**Member 2:** Select and document the dataset and test images.  
-**Member 3:** Create the SQLite database and basic schema.  
-**Member 4:** Build the initial Streamlit page and image upload.  
-**Member 5:** Draft the priority rules and their limitations.  
-**Member 6:** Set up repository structure, `.gitignore`, and dependency instructions.
-
-**Milestone:** Every component has a basic starting version.
-
-### Days 3–5 — Independent components
-
-- Member 1: return detections in the agreed format and produce annotated images.
-- Member 2: prepare test cases and begin evaluating predictions.
-- Member 3: finish save/retrieve functions and test persistence.
-- Member 4: show uploads and a placeholder results layout.
-- Member 5: implement priority assignment and explanations.
-- Member 6: test each component independently and resolve interface mismatches.
-
-**Milestone:** Components work separately, and the team agrees on the final handoff format.
-
-### Days 6–8 — Integration
-
-- Connect the UI to the detector.
-- Pass detections to the prioritization function.
-- Save inspection results to SQLite.
-- Show annotated images, results, and inspection history.
-- Test the entire flow on one machine.
-- Fix the most important integration bugs.
-
-**Milestone:** One complete end-to-end prototype works by Day 8.
-
-### Days 9–11 — Testing and improvement
-
-- Test on images not used during development.
-- Record false positives, false negatives, and limitations.
-- Calculate suitable metrics if reliable labels are available.
-- Improve UI clarity and error handling.
-- Check that the database persists across restarts.
-- Confirm that empty detection results are handled correctly.
-
-**Milestone:** The prototype has been tested and its performance is documented honestly.
-
-### Days 12–14 — Freeze, document, and present
-
-- Stop adding major features.
-- Fix critical bugs only.
-- Complete setup instructions and documentation.
-- Prepare an architecture diagram and presentation.
-- Rehearse the demo from a clean launch.
-- Keep sample images and annotated outputs as a fallback.
-
-**Milestone:** The project can be launched and demonstrated reliably.
+### 4.3 Full Inspection Database Record (Saved by Team 2, Displayed by Team 3)
+```python
+{
+    "inspection_id": "INSP-20261025-001",
+    "timestamp": "2026-10-25 14:30:00",
+    "image_name": "track_milemarker_42_km12.jpg",
+    "image_path": "uploads/track_milemarker_42_km12.jpg",
+    "annotated_image_path": "outputs/annotated_track_milemarker_42_km12.jpg",
+    "total_defects_found": 1,
+    "overall_priority": "HIGH",
+    "recommendation": "Dispatch maintenance crew for ultrasound inspection within 24 hours.",
+    "defects": [
+        {
+            "class_name": "crack",
+            "confidence": 0.89,
+            "bbox": [120, 245, 380, 410],
+            "priority": "HIGH"
+        }
+    ]
+}
+```
 
 ---
 
-## 6. Daily Team Routine
+## 5. Suggested Project Directory Structure
 
-Have a short check-in every day. Each member reports:
-
-1. **Completed:** What did I finish since the last check-in?
-2. **Next:** What will I finish today?
-3. **Blocked:** What is preventing progress?
-
-Update a GitHub Project board or issue list with these statuses:
-
-- `To do`
-- `In progress`
-- `Blocked`
-- `In review`
-- `Done`
-
-If someone is blocked for more than a day, notify the team and simplify the feature rather than delaying integration.
-
----
-
-## 7. Testing Checklist
-
-### Detection
-- [ ] The model loads successfully.
-- [ ] A valid image produces a result.
-- [ ] Bounding boxes and confidence values are displayed when supported.
-- [ ] An image with no predicted detections is handled correctly.
-- [ ] The team has tested images not used to develop the model.
-
-### Data and prioritization
-- [ ] Priority rules are documented and explainable.
-- [ ] Confidence is not incorrectly treated as severity.
-- [ ] Invalid or missing fields are handled safely.
-- [ ] Inspection records can be saved and retrieved.
-- [ ] Multiple detections from one image are handled consistently.
-
-### Dashboard and integration
-- [ ] Image upload works.
-- [ ] Annotated output and detection details appear.
-- [ ] Inspection history is displayed.
-- [ ] Errors are shown clearly.
-- [ ] The app launches using the documented steps.
-- [ ] The complete workflow has been tested on the demo machine.
-
-### Presentation
-- [ ] The team can explain the architecture and each component.
-- [ ] Evaluation results and limitations are documented.
-- [ ] A backup demo image/output is ready.
-- [ ] No feature is presented as production-ready railway safety certification.
-
----
-
-## 8. Definition of Done
-
-The prototype is ready to present when a team member can launch the app, upload a sample railway image, see model predictions, view a preliminary priority category, save the inspection, and find it in the history dashboard.
-
-**Priority order:** working end-to-end flow first, reliable testing second, visual polish third, advanced features last.
-
-## 9. Optional Features — Only If the Core Prototype Is Stable
-
-Consider these only after the main workflow works:
-
-- Video input
-- Exporting inspection reports to CSV
-- Filtering history by defect type or priority
-- Comparing repeat inspections of the same identified track segment
-- More advanced severity estimation
-- Location mapping, if trustworthy location data is available
-
-Do not add these at the expense of the core demo.
+```text
+InfeRail/
+├── app.py                          # Main Streamlit Application (Team 3)
+├── requirements.txt                # Unified Python Dependencies (Team 3)
+├── README.md                       # Project Guide & Documentation (All)
+├── .gitignore                      # Git Ignore Configurations (Team 3)
+├── config.py                       # Global Path & Threshold Settings (All)
+│
+├── detection/                      # Owned by Team 1
+│   ├── __init__.py
+│   ├── detector.py                 # Inference wrapper for YOLOv8/YOLOv11
+│   ├── preprocessing.py          # CLAHE, resizing, normalization
+│   └── visualizer.py               # Bounding box rendering utilities
+│
+├── dataset/                        # Owned by Team 1
+│   ├── README.md                   # Dataset documentation & download links
+│   ├── sample_test_images/         # Curated test images for demo & testing
+│   └── evaluate.py                 # Evaluation metrics script (mAP, F1)
+│
+├── prioritization/                 # Owned by Team 2
+│   ├── __init__.py
+│   ├── severity.py                 # Rule-based priority assignment engine
+│   └── rules_config.json           # Configurable priority thresholds & logic
+│
+├── database/                       # Owned by Team 2
+│   ├── __init__.py
+│   ├── schema.sql                  # SQLite DDL scripts
+│   ├── db.py                       # Database connection and CRUD functions
+│   └── seed_data.py                # Synthetic history generator for testing
+│
+├── dashboard/                      # Owned by Team 3
+│   ├── __init__.py
+│   ├── components.py               # UI widgets, layout containers, cards
+│   ├── charts.py                   # Plotly charts for analytics
+│   └── export.py                   # CSV / PDF export utilities
+│
+├── tests/                          # Owned by Team 3 with inputs from all
+│   ├── test_detection.py           # Team 1 tests
+│   ├── test_prioritization.py      # Team 2 tests
+│   ├── test_database.py            # Team 2 tests
+│   └── test_integration.py         # End-to-end integration tests (Team 3)
+│
+├── models/                         # Model weights directory (gitignored)
+│   └── best.pt
+│
+├── uploads/                        # User-uploaded images (gitignored)
+└── outputs/                        # Saved annotated images (gitignored)
+```
 
 ---
 
-## 10. Meeting Notes and Decisions
+## 6. Two-Week Execution Plan
 
-Use this section to keep team decisions in one place.
+```mermaid
+gantt
+    title InfeRail 2-Week Sprint Schedule
+    dateFormat  YYYY-MM-DD
+    section Phase 1: Setup & Foundations
+    Repo setup, contracts, environment (All)     :done,    p1, 2026-10-26, 2d
+    Dataset curation & baseline model (Team 1)   :active,  p2, 2026-10-26, 3d
+    DB schema & Severity rules draft (Team 2)    :active,  p3, 2026-10-26, 3d
+    Streamlit wireframe & layout (Team 3)        :active,  p4, 2026-10-26, 3d
+    section Phase 2: Core Development
+    Model fine-tuning & inference pipeline (Team 1) :      p5, 2026-10-29, 4d
+    CRUD operations & priority logic (Team 2)       :      p6, 2026-10-29, 4d
+    UI components & analytics charts (Team 3)       :      p7, 2026-10-29, 4d
+    section Phase 3: Integration
+    Connect Detection + Severity + DB (All)         :      p8, 2026-11-02, 3d
+    Full end-to-end UI testing (Team 3 Lead)        :      p9, 2026-11-03, 3d
+    section Phase 4: Validation & Polish
+    Benchmark metrics & edge-case testing (Team 1)  :      p10, 2026-11-05, 2d
+    Persistence hardening & export features (Team 2):      p11, 2026-11-05, 2d
+    UI polish & demo rehearsal (Team 3)             :      p12, 2026-11-06, 3d
+```
 
-- **Team members and names:** Add names for Members 1–6.
-- **Chosen dataset and source:** Add link and usage/licensing notes.
-- **Chosen model and version:** Record the exact model.
-- **Supported defect categories:** List the categories the prototype can detect.
-- **Python version:** Record the version used by the team.
-- **How to run the app:** Add the final commands after setup is tested.
-- **Known limitations:** List model, dataset, and prioritization limitations.
+### Detailed Schedule by Day:
 
+- **Days 1–2 (Sprint Kickoff & Setup):**
+  - **All:** Align on shared data contracts and Python 3.10/3.11 environment.
+  - **Team 1:** Download sample dataset and run baseline YOLO detection.
+  - **Team 2:** Initialize SQLite database with DDL tables; document priority rules.
+  - **Team 3:** Set up Git repo, initialize Streamlit app with file uploader dummy layout.
+  - *Milestone:* All 3 teams have working initial scaffolding on independent branches.
+
+- **Days 3–5 (Component Development):**
+  - **Team 1:** Package `detect_defects()` to return standard JSON detections + annotated image; prepare evaluation script.
+  - **Team 2:** Complete `save_inspection()` and `get_history()` in `db.py`; code `assign_priority()` rules in `severity.py`.
+  - **Team 3:** Build detection viewer, history table widget, and basic metrics charts using mock data.
+  - *Milestone:* Each team completes standalone unit tests for their respective module.
+
+- **Days 6–8 (First Integrated Prototype):**
+  - **Integration Session:** Team 3 links Team 1's detector and Team 2's severity + database into `app.py`.
+  - Verify complete loop: Upload image -> Run YOLO -> Compute severity -> Save to SQLite -> Render on UI -> View in History table.
+  - *Milestone:* First end-to-end prototype functioning on a developer machine.
+
+- **Days 9–11 (Robustness, Testing & Error Handling):**
+  - **Team 1:** Benchmark accuracy metrics on unseen test images; record confusion matrix and failure cases.
+  - **Team 2:** Add database indexing, history filtering queries (by defect type, date, severity), and verify database persistence.
+  - **Team 3:** Graceful handling of edge cases: blank images, unreadable formats, zero detections ("Track clear"), and model timeouts. Add CSV/PDF export.
+  - *Milestone:* System passes full test suite without breaking on corrupt or empty inputs.
+
+- **Days 12–14 (Code Freeze, Documentation & Demo Prep):**
+  - Strict feature freeze: only bug fixes permitted.
+  - Prepare high-confidence demo dataset and backup video recording/screenshots.
+  - Finalize README, installation guide, and presentation slide deck.
+  - Rehearse the live walkthrough end-to-end.
+  - *Milestone:* Project successfully presented and delivered.
+
+---
+
+## 7. Testing & Quality Assurance Checklist
+
+### Team 1 Checklist (Vision & AI)
+- [ ] Model weights download cleanly and load into memory without path errors.
+- [ ] Bounding boxes, labels, and confidence scores match the shared data contract.
+- [ ] Images with no defects return an empty detection list (do not crash).
+- [ ] Inference time is logged and runs in < 1.5 seconds per standard image on CPU/GPU.
+- [ ] Evaluation metrics (mAP@50, Precision, Recall) are documented on the test set.
+
+### Team 2 Checklist (Database & Prioritization)
+- [ ] Priority rules cover all supported defect classes without throwing unhandled exceptions.
+- [ ] Confidence score is not conflated with severity.
+- [ ] Database persists data across complete application restarts.
+- [ ] Inspection records and associated defect records maintain correct foreign key relationships.
+- [ ] SQL queries handle special characters and missing fields safely.
+
+### Team 3 Checklist (Dashboard & Integration)
+- [ ] Streamlit web UI starts cleanly with a single command (`streamlit run app.py`).
+- [ ] Uploading PNG, JPG, and JPEG formats works seamlessly.
+- [ ] Original and annotated images display side-by-side with clear defect legends.
+- [ ] History table correctly filters by defect type and priority level.
+- [ ] Export buttons generate valid CSV or PDF summaries.
+
+---
+
+## 8. Definition of Done (DoD)
+
+The InfeRail project is considered **Done and Demo-Ready** when:
+1. **End-to-End Execution:** A user can launch the app, upload an arbitrary railway track image, observe real-time defect annotations, review the rule-based maintenance recommendation, and verify the record is saved to the history log.
+2. **Defect Coverage:** The system reliably detects key target defects (e.g., surface cracks, missing fasteners).
+3. **Data Integrity:** Historical records survive application restarts with intact timestamps, bounding box metadata, and priority reasons.
+4. **Clean Code & Reproducibility:** Anyone can clone the repository, install dependencies via `pip install -r requirements.txt`, and launch the app without manual file editing.
+5. **Academic Honesty:** Limitations, false-positive vulnerabilities, and railway safety boundaries are clearly documented.
