@@ -1,0 +1,20 @@
+# InfeRail — Unified Python Dependencies
+# Computer Vision & Deep Learning
+ultralytics>=8.3.0
+opencv-python>=4.8.0
+pillow>=10.0.0
+albumentations>=1.4.0
+scikit-learn>=1.4.0
+
+# Numerical & Data Processing
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Web Dashboard & Visualization
+streamlit>=1.35.0
+plotly>=5.20.0
+matplotlib>=3.8.0
+
+# Data Validation, Schema & Testing
+pydantic>=2.7.0
+pytest>=8.0.0
