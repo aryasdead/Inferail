@@ -47,6 +47,7 @@ except ImportError:
 CLASS_NAMES: Dict[int, str] = {0: "non-cracked", 1: "cracked"}
 DEFAULT_THRESHOLD: float = 0.5
 MODEL_INPUT_SIZE: Tuple[int, int] = (224, 224)
+DEFAULT_MODEL_PATH: Path = Path(__file__).resolve().parent.parent / 'models' / 'crack_classifier.pth'
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -221,7 +222,10 @@ def classify_crack(
 
     # Initialize model if not provided
     if model is None:
-        model = CrackClassifier(pretrained=True, freeze_backbone=False)
+        if DEFAULT_MODEL_PATH.is_file():
+            model = load_model(DEFAULT_MODEL_PATH, device=device)
+        else:
+            model = CrackClassifier(pretrained=True, freeze_backbone=False)
 
     model = model.to(device)
     model.eval()
