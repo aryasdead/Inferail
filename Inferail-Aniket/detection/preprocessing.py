@@ -399,6 +399,87 @@ def preprocess_for_inference(
     }
 
 
+def compute_edge_density(
+    image_rgb: np.ndarray,
+    low_threshold: int = 50,
+    high_threshold: int = 150,
+) -> float:
+    """Compute the edge density of an image using Canny edge detection.
+
+    Edge density is the fraction of pixels that are edges. Cracked surfaces
+    exhibit significantly higher edge density than smooth rail surfaces,
+    making this a useful supplementary feature for the classifier.
+
+    Args:
+        image_rgb: 3-channel RGB image (uint8).
+        low_threshold: Canny lower hysteresis threshold.
+        high_threshold: Canny upper hysteresis threshold.
+
+    Returns:
+        float: Edge density ratio in [0.0, 1.0]. Higher values suggest
+            more texture / potential cracks.
+    """
+    gray = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2GRAY)
+    edges = cv2.Canny(gray, low_threshold, high_threshold)
+    return float(np.count_nonzero(edges) / edges.size)
+
+
+def preprocess_for_classification(
+    image_input: Union[str, Path, np.ndarray, Image.Image, bytes],
+    target_size: Union[int, Tuple[int, int]] = (224, 224),
+    use_clahe: bool = True,
+    use_denoise: bool = True,
+    clahe_clip_limit: float = 2.5,
+    normalize_imagenet: bool = True,
+) -> Dict[str, Any]:
+    """Preprocess a single image for crack vs non-crack binary classification.
+
+    This is the **primary entry point** for the CrackClassifier model. It wraps
+    ``preprocess_for_inference()`` and adds supplementary features that aid
+    binary classification:
+
+        - ``edge_density``: Canny edge ratio on the enhanced image — cracked
+          surfaces have noticeably higher edge density (~0.08–0.15) than clean
+          rail (~0.02–0.05).
+        - ``mean_intensity``: Average pixel intensity of the enhanced image,
+          useful for detecting overexposed / underexposed frames.
+
+    The output dict contains a ready-to-feed ``'tensor'`` key with shape
+    (1, 3, target_h, target_w) — the exact input the CrackClassifier expects.
+
+    Args:
+        image_input: File path (str/Path), numpy array, PIL Image, or bytes.
+        target_size: Model input resolution (default 224×224).
+        use_clahe: Enable CLAHE contrast enhancement (recommended for
+            shadow-heavy track images).
+        use_denoise: Enable bilateral edge-preserving denoising.
+        clahe_clip_limit: Contrast clip limit for CLAHE.
+        normalize_imagenet: If True, applies ImageNet standardization.
+
+    Returns:
+        Dict containing all keys from ``preprocess_for_inference()`` plus:
+            - 'edge_density': float — Canny edge ratio of the enhanced image.
+            - 'mean_intensity': float — Mean grayscale intensity of enhanced image.
+    """
+    result = preprocess_for_inference(
+        image_input,
+        target_size=target_size,
+        use_clahe=use_clahe,
+        use_denoise=use_denoise,
+        clahe_clip_limit=clahe_clip_limit,
+        normalize_imagenet=normalize_imagenet,
+    )
+
+    # Compute supplementary features on the enhanced (pre-letterbox) image
+    enhanced = result["enhanced_rgb"]
+    result["edge_density"] = compute_edge_density(enhanced)
+
+    gray = cv2.cvtColor(enhanced, cv2.COLOR_RGB2GRAY)
+    result["mean_intensity"] = float(gray.mean())
+
+    return result
+
+
 def get_training_augmentations(img_size: int = 224, is_classifier: bool = True):
     """Build Albumentations augmentation pipeline tailored for railway track defect training.
 
@@ -582,3 +663,60 @@ try:
 
 except ImportError:
     TrackClassifierDataset = None  # type: ignore
+
+
+if __name__ == "__main__":
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(description="InfeRail Image Preprocessing Pipeline CLI")
+    parser.add_argument(
+        "--image",
+        type=str,
+        default="dataset/sample_test_images/user_track_input.jpg",
+        help="Path to input railway track image",
+    )
+    parser.add_argument(
+        "--target-size",
+        type=int,
+        nargs="+",
+        default=[224, 224],
+        help="Target size as H W (default: 224 224)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="outputs",
+        help="Directory to save preprocessed output images",
+    )
+    args = parser.parse_args()
+
+    target = tuple(args.target_size) if len(args.target_size) == 2 else (args.target_size[0], args.target_size[0])
+    img_path = Path(args.image)
+
+    if not img_path.is_file():
+        # Fallback to any existing sample
+        sample_fallback = Path("dataset/sample_test_images/track_sample_clean.jpg")
+        if sample_fallback.is_file():
+            img_path = sample_fallback
+
+    print(f"[InfeRail Preprocessing] Ingesting: {img_path}")
+    print(f"[InfeRail Preprocessing] Target dimensions: {target}")
+
+    res = preprocess_for_inference(img_path, target_size=target)
+
+    print("\n--- Pipeline Result Data Contract ---")
+    print(f"Original shape: {res['original_shape']}")
+    print(f"Scale ratio: {res['ratio']:.5f}")
+    print(f"Padding (dw, dh): {res['pad']}")
+    print(f"Enhanced RGB shape: {res['enhanced_rgb'].shape}, dtype: {res['enhanced_rgb'].dtype}")
+    print(f"Letterboxed RGB shape: {res['letterboxed_rgb'].shape}, dtype: {res['letterboxed_rgb'].dtype}")
+    print(f"Tensor shape: {res['tensor'].shape}, dtype: {res['tensor'].dtype}")
+    print(f"Tensor stats: min={res['tensor'].min():.3f}, max={res['tensor'].max():.3f}, mean={res['tensor'].mean():.3f}, std={res['tensor'].std():.3f}")
+
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(str(out_dir / "enhanced.jpg"), cv2.cvtColor(res["enhanced_rgb"], cv2.COLOR_RGB2BGR))
+    cv2.imwrite(str(out_dir / "letterboxed.jpg"), cv2.cvtColor(res["letterboxed_rgb"], cv2.COLOR_RGB2BGR))
+    print(f"\n[Saved] Enhanced & letterboxed images written to: {out_dir.resolve()}")
+
