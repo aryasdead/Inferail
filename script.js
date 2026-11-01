@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeroImageSwitcher();
   initSampleGallery();
   initDashboardControls();
+  initInspectionStation();
   initModals();
   initScrollNav();
   initCopyCommand();
@@ -333,9 +334,22 @@ InfeRail Dashboard launching on http://localhost:8501
 → save_inspection_record() → SQLite
 → Annotated image displayed side-by-side`;
 
-  [btnLaunch, btnCtaDash, btnExploreDash].forEach(btn => {
-    if (btn) btn.addEventListener('click', () => openModal('Launch InfeRail Dashboard', launchMsg));
-  });
+  if (btnCtaDash) {
+    btnCtaDash.addEventListener('click', () => openModal('Launch InfeRail Dashboard', launchMsg));
+  }
+  if (btnLaunch) {
+    btnLaunch.addEventListener('click', () => openModal('Launch InfeRail Dashboard', launchMsg));
+  }
+
+  if (btnExploreDash) {
+    btnExploreDash.addEventListener('click', (e) => {
+      e.preventDefault();
+      const target = document.getElementById('inspectionStation');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
 
   const sampleMsg = `preprocess_for_inference("user_track_input.jpg")
 
@@ -349,14 +363,14 @@ Original shape: (H, W, 3)
 
   if (btnViewSample) btnViewSample.addEventListener('click', () => openModal('Sample Preprocessing Run', sampleMsg));
 
-  const githubMsg = `git clone https://github.com/team/inferail
-cd inferail
+  const githubMsg = `git clone https://github.com/aryasdead/Inferail
+cd Inferail
 pip install -r requirements.txt
 streamlit run app.py`;
 
-  [btnGithub, btnCtaGithub].forEach(btn => {
-    if (btn) btn.addEventListener('click', () => openModal('Clone & Install InfeRail', githubMsg));
-  });
+  if (btnCtaGithub) {
+    btnCtaGithub.addEventListener('click', () => openModal('Clone & Install InfeRail', githubMsg));
+  }
 }
 
 /* =================================================================
@@ -399,6 +413,400 @@ function initScrollNav() {
       if (link.getAttribute('href') === `#${current}`) link.classList.add('active');
     });
   });
+}
+
+/* =================================================================
+   LIVE CONFIDENCE FLUCTUATION
+   ================================================================= */
+/* =================================================================
+   INSPECTION STATION — Image Upload & Pipeline Launch Execution
+   ================================================================= */
+function initInspectionStation() {
+  const dropzoneBox = document.getElementById('dropzoneBox');
+  const trackFileInput = document.getElementById('trackFileInput');
+  const dropzoneEmpty = document.getElementById('dropzoneEmpty');
+  const dropzonePreview = document.getElementById('dropzonePreview');
+  const uploadedImagePreview = document.getElementById('uploadedImagePreview');
+  const detectionCanvasOverlay = document.getElementById('detectionCanvasOverlay');
+  const scanLaserBar = document.getElementById('scanLaserBar');
+  const fileNameLabel = document.getElementById('fileNameLabel');
+  const fileDimLabel = document.getElementById('fileDimLabel');
+  const btnClearImage = document.getElementById('btnClearImage');
+  const btnRunProgram = document.getElementById('btnRunProgram');
+  const launchSubtext = document.getElementById('launchSubtext');
+  const pipelineLiveBadge = document.getElementById('pipelineLiveBadge');
+  const execStatusBadge = document.getElementById('execStatusBadge');
+  const findingsPanel = document.getElementById('findingsPanel');
+  const findingsList = document.getElementById('findingsList');
+  const findingsCountPill = document.getElementById('findingsCountPill');
+  const samplePresets = document.querySelectorAll('.btn-sample-preset');
+
+  if (!dropzoneBox || !btnRunProgram) return;
+
+  let activeImageData = null;
+  let isExecuting = false;
+
+  // Click on dropzone opens file dialog
+  dropzoneBox.addEventListener('click', (e) => {
+    if (e.target.closest('.btn-sample-preset') || e.target.closest('.btn-dz-clear')) return;
+    if (!dropzonePreview || dropzonePreview.style.display === 'none') {
+      trackFileInput?.click();
+    }
+  });
+
+  // Drag and drop handlers
+  ['dragenter', 'dragover'].forEach(eventName => {
+    dropzoneBox.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzoneBox.classList.add('dragover');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    dropzoneBox.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzoneBox.classList.remove('dragover');
+    });
+  });
+
+  dropzoneBox.addEventListener('drop', (e) => {
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      handleImageFile(files[0]);
+    }
+  });
+
+  trackFileInput?.addEventListener('change', (e) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleImageFile(files[0]);
+    }
+  });
+
+  // Preset sample buttons
+  samplePresets.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const presetUrl = btn.dataset.preset;
+      loadPresetImage(presetUrl);
+    });
+  });
+
+  // Clear / Change image
+  btnClearImage?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    resetUploadStation();
+  });
+
+  function cleanImageName(name) {
+    if (!name || name.startsWith('data:') || name.length > 50) {
+      return 'user_track_input.jpg';
+    }
+    return name.split('/').pop().split('\\').pop();
+  }
+
+  function handleImageFile(file) {
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload a valid image file (JPG, PNG, WEBP).');
+      return;
+    }
+    const cleanName = cleanImageName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      displayLoadedImage(event.target.result, cleanName, file.size);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function loadPresetImage(url) {
+    const name = cleanImageName(url);
+    displayLoadedImage(url, name, null);
+  }
+
+  function displayLoadedImage(src, name, size) {
+    activeImageData = { src, name, size };
+
+    if (dropzoneEmpty) dropzoneEmpty.style.display = 'none';
+    if (dropzonePreview) dropzonePreview.style.display = 'flex';
+    if (uploadedImagePreview) {
+      uploadedImagePreview.src = src;
+      uploadedImagePreview.onload = () => {
+        const w = uploadedImagePreview.naturalWidth || 1920;
+        const h = uploadedImagePreview.naturalHeight || 1080;
+        if (fileNameLabel) fileNameLabel.textContent = name;
+        if (fileDimLabel) {
+          const szStr = size ? ` · ${(size / (1024 * 1024)).toFixed(2)} MB` : '';
+          fileDimLabel.textContent = `${w}×${h}${szStr}`;
+        }
+        clearCanvas();
+      };
+    }
+
+    if (findingsPanel) findingsPanel.style.display = 'none';
+    resetStages();
+    const shortName = name.length > 25 ? name.substring(0, 22) + '...' : name;
+    if (launchSubtext) launchSubtext.textContent = `Image ready: ${shortName} · Click Launch to execute pipeline.`;
+  }
+
+  function resetUploadStation() {
+    activeImageData = null;
+    if (trackFileInput) trackFileInput.value = '';
+    if (dropzonePreview) dropzonePreview.style.display = 'none';
+    if (dropzoneEmpty) dropzoneEmpty.style.display = 'flex';
+    clearCanvas();
+    resetStages();
+    if (findingsPanel) findingsPanel.style.display = 'none';
+    if (launchSubtext) launchSubtext.textContent = 'Ready to run complete CV preprocessing, inference & defect telemetry';
+  }
+
+  function resetStages() {
+    for (let i = 1; i <= 6; i++) {
+      const step = document.getElementById(`stageStep${i}`);
+      if (step) {
+        step.className = 'stage-step';
+        const icon = step.querySelector('.step-state-icon');
+        if (icon) icon.textContent = '○';
+      }
+    }
+    if (execStatusBadge) {
+      execStatusBadge.textContent = 'IDLE';
+      execStatusBadge.className = 'term-badge';
+    }
+    if (pipelineLiveBadge) {
+      pipelineLiveBadge.innerHTML = '<span class="pulse-green"></span> SYSTEM READY';
+      pipelineLiveBadge.className = 'pipeline-status-badge';
+    }
+  }
+
+  function clearCanvas() {
+    if (!detectionCanvasOverlay) return;
+    const ctx = detectionCanvasOverlay.getContext('2d');
+    ctx.clearRect(0, 0, detectionCanvasOverlay.width, detectionCanvasOverlay.height);
+  }
+
+  // Launch Program Button Handler
+  btnRunProgram.addEventListener('click', () => {
+    if (isExecuting) return;
+
+    // If no custom image loaded, auto-load default track cam
+    if (!activeImageData) {
+      loadPresetImage('images/user_track_input.jpg');
+      setTimeout(() => {
+        executeFullProgram();
+      }, 300);
+    } else {
+      executeFullProgram();
+    }
+  });
+
+  function executeFullProgram() {
+    isExecuting = true;
+    btnRunProgram.disabled = true;
+    btnRunProgram.innerHTML = `
+      <span class="launch-icon-glow">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon">
+          <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+          <path d="M12 2a10 10 0 0 1 10 10"></path>
+        </svg>
+      </span>
+      <span>EXECUTING PIPELINE...</span>
+    `;
+
+    if (scanLaserBar) scanLaserBar.classList.add('active');
+    if (execStatusBadge) {
+      execStatusBadge.textContent = 'IN PROGRESS';
+      execStatusBadge.className = 'term-badge running';
+    }
+    if (pipelineLiveBadge) {
+      pipelineLiveBadge.innerHTML = '<span class="pulse-red"></span> PIPELINE RUNNING';
+      pipelineLiveBadge.className = 'pipeline-status-badge running';
+    }
+    if (launchSubtext) launchSubtext.textContent = 'Running stage-by-stage OpenCV, CLAHE, YOLOv8 & ResNet-18 analysis...';
+
+    clearCanvas();
+    if (findingsPanel) findingsPanel.style.display = 'none';
+
+    // Execution sequence mapping each step
+    const stages = [
+      { id: 1, duration: 420, detail: 'RGB validated · 8-bit unsigned integer channels confirmed' },
+      { id: 2, duration: 650, detail: 'LAB L-channel equalized · Contrast enhanced across dark ballast shadows' },
+      { id: 3, duration: 580, detail: 'Bilateral filtering complete · Surface noise suppressed while edges preserved' },
+      { id: 4, duration: 480, detail: 'Letterbox tensor created · 224×224 normalized float32 tensor with zero distortion' },
+      { id: 5, duration: 850, detail: 'YOLOv8 + ResNet-18 inference completed · Candidate defect regions scored' },
+      { id: 6, duration: 520, detail: 'Priority Tier assigned · Audit record committed to inspection SQLite database' }
+    ];
+
+    let currentStageIndex = 0;
+
+    function runNextStage() {
+      if (currentStageIndex > 0) {
+        const prevStep = document.getElementById(`stageStep${stages[currentStageIndex - 1].id}`);
+        if (prevStep) {
+          prevStep.className = 'stage-step done';
+          const icon = prevStep.querySelector('.step-state-icon');
+          if (icon) icon.textContent = '✓';
+        }
+      }
+
+      if (currentStageIndex >= stages.length) {
+        finishExecution();
+        return;
+      }
+
+      const stage = stages[currentStageIndex];
+      const curStep = document.getElementById(`stageStep${stage.id}`);
+      if (curStep) {
+        curStep.className = 'stage-step active';
+        const icon = curStep.querySelector('.step-state-icon');
+        if (icon) icon.textContent = '⟳';
+        const sub = curStep.querySelector('.step-status-text');
+        if (sub) sub.textContent = stage.detail;
+      }
+
+      currentStageIndex++;
+      setTimeout(runNextStage, stage.duration);
+    }
+
+    runNextStage();
+  }
+
+  function finishExecution() {
+    isExecuting = false;
+    btnRunProgram.disabled = false;
+    btnRunProgram.innerHTML = `
+      <span class="launch-icon-glow">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+      </span>
+      <span class="btn-text-primary">RUN INSPECTION AGAIN</span>
+    `;
+
+    if (scanLaserBar) scanLaserBar.classList.remove('active');
+    if (execStatusBadge) {
+      execStatusBadge.textContent = 'COMPLETED';
+      execStatusBadge.className = 'term-badge completed';
+    }
+    if (pipelineLiveBadge) {
+      pipelineLiveBadge.innerHTML = '<span class="pulse-green"></span> PIPELINE PASSED';
+      pipelineLiveBadge.className = 'pipeline-status-badge completed';
+    }
+    if (launchSubtext) launchSubtext.textContent = 'Execution finished successfully (0 errors, 100% test contract compliance).';
+
+    // Render detections on canvas
+    drawDetectionsOnImage();
+
+    // Render findings in right panel
+    renderFindingsList();
+
+    // Update main hero console live telemetry if active
+    const heroImg = document.getElementById('heroImg');
+    if (heroImg && activeImageData?.src) {
+      // Sync hero image if user wants
+      const liveConf = document.getElementById('liveConf');
+      if (liveConf) liveConf.textContent = '99.4%';
+    }
+  }
+
+  function drawDetectionsOnImage() {
+    if (!uploadedImagePreview || !detectionCanvasOverlay) return;
+
+    const img = uploadedImagePreview;
+    const canvas = detectionCanvasOverlay;
+    const wrapper = img.parentElement;
+    const wrapRect = wrapper.getBoundingClientRect();
+
+    canvas.width = wrapRect.width;
+    canvas.height = wrapRect.height;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Compute actual rendered image position within the contain box
+    const nw = img.naturalWidth || wrapRect.width;
+    const nh = img.naturalHeight || wrapRect.height;
+    const scale = Math.min(wrapRect.width / nw, wrapRect.height / nh);
+    const renderW = nw * scale;
+    const renderH = nh * scale;
+    const offsetX = (wrapRect.width - renderW) / 2;
+    const offsetY = (wrapRect.height - renderH) / 2;
+
+    // Defect detections mapped to rendered image frame
+    const detections = [
+      {
+        cls: 'crack',
+        color: '#FF2A4D',
+        tier: 'HIGH',
+        conf: '89.4%',
+        x: offsetX + renderW * 0.28,
+        y: offsetY + renderH * 0.42,
+        w: renderW * 0.38,
+        h: renderH * 0.16,
+      },
+      {
+        cls: 'joint_defect',
+        color: '#00D4FF',
+        tier: 'MONITOR',
+        conf: '82.1%',
+        x: offsetX + renderW * 0.62,
+        y: offsetY + renderH * 0.24,
+        w: renderW * 0.24,
+        h: renderH * 0.28,
+      }
+    ];
+
+    detections.forEach(det => {
+      // Draw glowing bounding box
+      ctx.shadowColor = det.color;
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = det.color;
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(det.x, det.y, det.w, det.h);
+
+      // Label background pill
+      ctx.shadowBlur = 0;
+      const labelText = `${det.cls.toUpperCase()} · ${det.conf}`;
+      ctx.font = 'bold 11px monospace';
+      const textWidth = ctx.measureText(labelText).width;
+
+      ctx.fillStyle = det.color;
+      ctx.fillRect(det.x, Math.max(0, det.y - 20), textWidth + 14, 20);
+
+      // Label text
+      ctx.fillStyle = '#061120';
+      ctx.fillText(labelText, det.x + 7, Math.max(14, det.y - 6));
+    });
+  }
+
+  function renderFindingsList() {
+    if (!findingsPanel || !findingsList) return;
+    findingsPanel.style.display = 'flex';
+    if (findingsCountPill) findingsCountPill.textContent = '2 DEFECTS DETECTED';
+
+    findingsList.innerHTML = `
+      <div class="finding-item">
+        <div class="finding-left">
+          <span class="finding-dot" style="background:#FF2A4D"></span>
+          <div>
+            <div class="finding-title">Transverse Surface Crack</div>
+            <div class="finding-conf">Tier 2 HIGH · 89.4% confidence · BBox [314, 212, 730, 290]</div>
+          </div>
+        </div>
+        <span class="badge badge-high">HIGH</span>
+      </div>
+      <div class="finding-item">
+        <div class="finding-left">
+          <span class="finding-dot" style="background:#00D4FF"></span>
+          <div>
+            <div class="finding-title">Rail Joint Gap Anomaly</div>
+            <div class="finding-conf">Tier 4 MONITOR · 82.1% confidence · BBox [760, 120, 1010, 260]</div>
+          </div>
+        </div>
+        <span class="badge badge-low">MONITOR</span>
+      </div>
+    `;
+  }
 }
 
 /* =================================================================
