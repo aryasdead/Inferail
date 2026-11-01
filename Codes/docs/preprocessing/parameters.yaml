@@ -1,0 +1,89 @@
+# InfeRail — Image Preprocessing Configuration & Hyperparameters
+# Owned by: Team 1 (AI & Computer Vision Lead / Preprocessing Specialist)
+
+# ==============================================================================
+# 1. INPUT VALIDATION & COLOR SPACE
+# ==============================================================================
+input_validation:
+  supported_extensions:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".bmp"
+    - ".tif"
+    - ".tiff"
+  target_color_space: "RGB"      # OpenCV default is BGR; converted to RGB for PyTorch/Streamlit
+  min_height: 10                 # Minimum acceptable image height (pixels)
+  min_width: 10                  # Minimum acceptable image width (pixels)
+  enforce_uint8: true            # Force pixel depth to uint8 [0, 255]
+
+# ==============================================================================
+# 2. CONTRAST ENHANCEMENT (CLAHE)
+# ==============================================================================
+# Contrast Limited Adaptive Histogram Equalization applied ONLY to the L (Lightness)
+# channel in LAB color space to penetrate shadows without blowing out steel crown reflections.
+clahe:
+  enabled: true
+  color_space: "LAB"             # Operates on 'L' channel of LAB (Luminance, A-chroma, B-chroma)
+  clip_limit: 2.5                # Contrast limit threshold. Range: 1.0 to 5.0. 
+                                 # (2.0 - 3.0 avoids amplifying ballast gravel noise)
+  tile_grid_size: [8, 8]         # Local grid division (e.g. 8x8 blocks for contextual equalization)
+
+# ==============================================================================
+# 3. DENOISING & TEXTURE FILTERING
+# ==============================================================================
+# Suppresses high-frequency ballast stone gravel textures while preserving crisp rail fractures.
+denoising:
+  enabled: true
+  method: "bilateral"            # Options: 'bilateral' (edge-preserving) or 'gaussian' (fast smooth)
+  bilateral:
+    d: 7                         # Diameter of pixel neighborhood (Range: 5 to 9)
+    sigma_color: 50.0            # Filter sigma in color space. Higher = wider color grouping
+    sigma_space: 50.0            # Filter sigma in coordinate space. Higher = farther pixels influence
+  gaussian:
+    ksize: 3                     # Odd kernel size (e.g. 3 or 5)
+    sigma_x: 0                   # Auto-calculated from ksize if 0
+
+# ==============================================================================
+# 4. ASPECT-RATIO PRESERVING LETTERBOXING
+# ==============================================================================
+# Resizes arbitrary inspection photos into a square tensor for classifier ingestion without
+# squishing, flattening, or distorting narrow surface crack dimensions.
+letterbox:
+  target_size: [224, 224]        # Height, Width for classifier (224x224 to start, or 384x384 if hairline cracks get lost)
+  fallback_target_size: [384, 384] # High-resolution alternative for faint hairline crack preservation
+  pad_color: [114, 114, 114]     # Neutral midpoint gray
+  auto: false                    # Minimum rectangle padding divisible by stride
+  scale_fill: false              # If true, stretches directly (do NOT use for crack detection)
+  scale_up: true                 # Allow upscaling if input is smaller than target_size
+  stride: 32                     # Grid stride constraint for neural net backbone
+
+# ==============================================================================
+# 5. NORMALIZATION & TENSOR CONVERSION
+# ==============================================================================
+# Converts pixel values for PyTorch tensor ingestion (÷255, then ImageNet mean/std).
+normalization:
+  dtype: "float32"
+  scale_factor: 255.0            # Divides [0, 255] -> [0.0, 1.0]
+  imagenet_standardization: true # Standardizes pixel intensities using ImageNet statistics
+  imagenet_mean: [0.485, 0.456, 0.406]
+  imagenet_std: [0.229, 0.224, 0.225]
+  channel_format: "CHW"          # Rearranges (Height, Width, Channels) -> (Channels, Height, Width)
+  batch_dimension: "added by the DataLoader in training, and only at inference" # (3, H, W) in training, (1, 3, H, W) at inference
+
+# ==============================================================================
+# 6. DATASET AUGMENTATIONS (TRAINING ONLY)
+# ==============================================================================
+# Albumentations pipeline simulating real outdoor railway track conditions.
+# Note: Duplicate CLAHE removed from augmentations; CLAHE is kept in the preprocessing pipeline only.
+augmentations:
+  horizontal_flip_prob: 0.5      # Flips track left-to-right (physically plausible)
+  brightness_contrast_prob: 0.6  # Simulates sunny vs. overcast conditions
+  brightness_limit: 0.2
+  contrast_limit: 0.2
+  motion_blur_prob: 0.3          # Simulates high-speed inspection vehicle camera shake
+  motion_blur_limit: 5
+  shift_scale_rotate_prob: 0.4   # Simulates camera angle variation from track centerline
+  rotate_limit: 10               # ±10 degrees rotation
+  scale_limit: 0.1               # ±10% scale variation
+  shift_limit: 0.05              # ±5% translation
