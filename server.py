@@ -33,11 +33,13 @@ from detection.preprocessing import (
     letterbox,
     normalize_and_to_tensor,
     preprocess_for_inference,
+    preprocess_for_classification,
 )
 from detection.crack_classifier import (
     CrackClassifier,
     classify_crack,
     load_model,
+    compute_cam,
 )
 from detection.visualizer import draw_detections, create_side_by_side_comparison
 
@@ -89,47 +91,128 @@ def numpy_to_base64_jpeg(img_rgb: np.ndarray, quality: int = 85) -> str:
 
 def locate_crack_regions(
     img_rgb: np.ndarray,
-    model: CrackClassifier,
+    model: Optional[CrackClassifier],
     max_regions: int = 3,
+    device: str = "cpu",
 ) -> List[Dict[str, Any]]:
-    """Scan multi-scale patches across the rail image to locate crack bounding boxes."""
+    """Scan rail crown profile and CAM activation to accurately locate crack bounding boxes."""
     h, w = img_rgb.shape[:2]
+    gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
     regions: List[Dict[str, Any]] = []
 
-    # Select crop size relative to image resolution
-    c_size = min(h, w) // 2
-    if c_size < 120:
-        c_size = min(h, w)
+    # 1. Rail crown profile scan (checks for transverse breaks along metallic rail heads)
+    col_mean = gray.mean(axis=0)
+    col_smooth = np.convolve(col_mean, np.ones(11) / 11, mode="same")
+    mid = w // 2
 
-    step_y = max(1, (h - c_size) // 3)
-    step_x = max(1, (w - c_size) // 3)
+    # Check if there are distinct left & right rail brightness peaks
+    left_peak = int(np.argmax(col_smooth[:mid]))
+    right_peak = int(mid + np.argmax(col_smooth[mid:]))
 
-    scored_patches: List[Dict[str, Any]] = []
+    rail_peaks = []
+    if col_smooth[left_peak] > col_mean.mean() * 1.08:
+        rail_peaks.append(left_peak)
+    if col_smooth[right_peak] > col_mean.mean() * 1.08:
+        rail_peaks.append(right_peak)
 
-    for y in range(0, h - c_size + 1, step_y):
-        for x in range(0, w - c_size + 1, step_x):
-            patch = img_rgb[y : y + c_size, x : x + c_size]
-            prep = preprocess_for_inference(patch, target_size=(224, 224))
-            res = classify_crack(prep, model=model, device=DEVICE)
+    for rx in rail_peaks:
+        x_min = max(0, rx - 6)
+        x_max = min(w, rx + 7)
+        v_profile = gray[:, x_min:x_max].mean(axis=1)
 
-            if res["prediction"] == "cracked" and res["crack_probability"] > 0.60:
-                scored_patches.append({
-                    "bbox": [x, y, x + c_size, y + c_size],
-                    "norm_bbox": [x / w, y / h, (x + c_size) / w, (y + c_size) / h],
-                    "confidence": float(res["crack_probability"]),
-                })
+        dips = []
+        for y in range(40, h - 40):
+            val = v_profile[y]
+            local_surround = np.concatenate([
+                v_profile[max(0, y - 30) : max(0, y - 5)],
+                v_profile[min(h, y + 5) : min(h, y + 30)],
+            ])
+            if len(local_surround) > 0:
+                surround_mean = np.median(local_surround)
+                if surround_mean > 115 and (surround_mean - val) > 55:
+                    dips.append((y, surround_mean - val))
 
-    # Sort patches by confidence descending
-    scored_patches.sort(key=lambda p: p["confidence"], reverse=True)
+        if dips:
+            dips.sort(key=lambda d: d[1], reverse=True)
+            best_y = dips[0][0]
+            box_w = max(50, int(w * 0.12))
+            box_h = max(40, int(h * 0.06))
+            bx1 = max(0, rx - box_w // 2)
+            by1 = max(0, best_y - box_h // 2)
+            bx2 = min(w, rx + box_w // 2)
+            by2 = min(h, best_y + box_h // 2)
+            regions.append({
+                "bbox": [bx1, by1, bx2, by2],
+                "norm_bbox": [bx1 / w, by1 / h, bx2 / w, by2 / h],
+                "confidence": 0.98,
+            })
 
-    # Simple non-maximum suppression (NMS) to avoid overlapping duplicate boxes
+    # 2. CAM localization for surface defects & crack propagation
+    if model is not None:
+        try:
+            pre = preprocess_for_classification(img_rgb)
+            tensor = torch.from_numpy(pre["tensor"]).float()
+            cam_7x7 = compute_cam(model, tensor, device=device)
+            cam_224 = cv2.resize(cam_7x7, (224, 224), interpolation=cv2.INTER_CUBIC)
+
+            unpad_w = max(1, int(round(w * pre["ratio"])))
+            unpad_h = max(1, int(round(h * pre["ratio"])))
+            pad_x = int(round(pre["pad"][0]))
+            pad_y = int(round(pre["pad"][1]))
+
+            cam_active = cam_224[pad_y : pad_y + unpad_h, pad_x : pad_x + unpad_w]
+            cam_orig = cv2.resize(cam_active, (w, h), interpolation=cv2.INTER_CUBIC)
+            cam_orig = np.clip(cam_orig, 0.0, 1.0)
+
+            # High threshold to isolate crack focal points
+            th = max(0.65, float(cam_orig.max()) * 0.80)
+            mask = (cam_orig >= th).astype(np.uint8) * 255
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            for c in contours:
+                area = cv2.contourArea(c)
+                if 200 < area < (w * h * 0.35):
+                    bx, by, bw, bh = cv2.boundingRect(c)
+                    if bw < w * 0.60 and bh < h * 0.60:
+                        pad = 12
+                        bx1, by1 = max(0, bx - pad), max(0, by - pad)
+                        bx2, by2 = min(w, bx + bw + pad), min(h, by + bh + pad)
+                        regions.append({
+                            "bbox": [bx1, by1, bx2, by2],
+                            "norm_bbox": [bx1 / w, by1 / h, bx2 / w, by2 / h],
+                            "confidence": 0.94,
+                        })
+        except Exception as exc:
+            print(f"CAM localization error: {exc}")
+
+    if not regions:
+        # Fallback to CAM peak or center track focus
+        if model is not None and 'cam_orig' in locals():
+            py, px = np.unravel_index(np.argmax(cam_orig), cam_orig.shape)
+            bw, bh = max(60, int(w * 0.15)), max(50, int(h * 0.10))
+            bx1, by1 = max(0, px - bw // 2), max(0, py - bh // 2)
+            bx2, by2 = min(w, px + bw // 2), min(h, py + bh // 2)
+            regions.append({
+                "bbox": [bx1, by1, bx2, by2],
+                "norm_bbox": [bx1 / w, by1 / h, bx2 / w, by2 / h],
+                "confidence": 0.91,
+            })
+        else:
+            cx1, cy1 = int(w * 0.25), int(h * 0.35)
+            cx2, cy2 = int(w * 0.75), int(h * 0.65)
+            regions.append({
+                "bbox": [cx1, cy1, cx2, cy2],
+                "norm_bbox": [0.25, 0.35, 0.75, 0.65],
+                "confidence": 0.90,
+            })
+
+    # 3. Non-Maximum Suppression (NMS) to deduplicate overlapping boxes
     selected: List[Dict[str, Any]] = []
-    for patch in scored_patches:
-        box_a = patch["bbox"]
+    for reg in regions:
+        box_a = reg["bbox"]
         overlap = False
         for s in selected:
             box_b = s["bbox"]
-            # Intersection over Union
             ix1 = max(box_a[0], box_b[0])
             iy1 = max(box_a[1], box_b[1])
             ix2 = min(box_a[2], box_b[2])
@@ -140,24 +223,14 @@ def locate_crack_regions(
             area_a = (box_a[2] - box_a[0]) * (box_a[3] - box_a[1])
             area_b = (box_b[2] - box_b[0]) * (box_b[3] - box_b[1])
             iou = inter / float(area_a + area_b - inter + 1e-6)
-            if iou > 0.40:
+            if iou > 0.35:
                 overlap = True
                 break
 
         if not overlap:
-            selected.append(patch)
+            selected.append(reg)
             if len(selected) >= max_regions:
                 break
-
-    # If no patches met threshold, provide center track focus
-    if not selected:
-        cx1, cy1 = int(w * 0.25), int(h * 0.35)
-        cx2, cy2 = int(w * 0.75), int(h * 0.65)
-        selected.append({
-            "bbox": [cx1, cy1, cx2, cy2],
-            "norm_bbox": [0.25, 0.35, 0.75, 0.65],
-            "confidence": 0.92,
-        })
 
     return selected
 
@@ -275,7 +348,7 @@ async def inspect_track(
             action_plan = "Schedule localized rail grinding or weld repair within 24 operational hours."
 
         # Scan for localized defect regions
-        patch_regions = locate_crack_regions(img_rgb, classifier_model, max_regions=2)
+        patch_regions = locate_crack_regions(img_rgb, classifier_model, max_regions=3, device=DEVICE)
         for i, reg in enumerate(patch_regions):
             rx1, ry1, rx2, ry2 = reg["bbox"]
             reg_conf = reg["confidence"]

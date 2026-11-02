@@ -28,6 +28,8 @@ from .crack_classifier import (
     CrackClassifier,
     classify_crack,
     classify_image,
+    compute_cam,
+    detect_and_visualize_cracks,
     save_model,
     load_model,
     get_model_summary,
@@ -64,6 +66,8 @@ __all__ = [
     "CrackClassifier",
     "classify_crack",
     "classify_image",
+    "compute_cam",
+    "detect_and_visualize_cracks",
     "save_model",
     "load_model",
     "get_model_summary",
@@ -71,4 +75,3 @@ __all__ = [
     "DEFAULT_THRESHOLD",
     "MODEL_INPUT_SIZE",
 ]
-
