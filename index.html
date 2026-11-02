@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InfeRail — AI Railway Defect Detection System</title>
+  <meta name="description" content="InfeRail uses YOLOv8 + ResNet-18 computer vision with CLAHE preprocessing to detect rail defects, assign maintenance priority, and visualize health trends on a real-time Streamlit dashboard.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Space+Grotesk:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="atm-glow glow-cyan"></div>
+  <div class="atm-glow glow-yellow"></div>
+  <canvas class="bg-particle-canvas" id="bgCanvas"></canvas>
+
+  <header class="topnav" id="topnav">
+    <div class="nav-inner">
+
+      <a class="brand" href="#home">
+        <div class="brand-logo-icon">
+          <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="44" height="44" rx="10" fill="url(#bnav-grad)"/>
+            <path d="M9 28.5L15 13.8C15.8 11.8 17.8 10.2 20 10.2H24C26.2 10.2 28.2 11.8 29 13.8L35 28.5C35.8 30.6 34 32.5 31.8 32.5H12.2C10 32.5 8.2 30.6 9 28.5Z" stroke="#041226" stroke-width="2.2" fill="#E2F952"/>
+            <path d="M14.5 18.5H29.5" stroke="#041226" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="15.5" cy="27" r="2" fill="#041226"/>
+            <circle cx="28.5" cy="27" r="2" fill="#041226"/>
+            <line x1="17.5" y1="32.5" x2="13.5" y2="37" stroke="#E2F952" stroke-width="2" stroke-linecap="round"/>
+            <line x1="26.5" y1="32.5" x2="30.5" y2="37" stroke="#E2F952" stroke-width="2" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="bnav-grad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#00F0FF"/><stop offset="1" stop-color="#E2F952"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="brand-words">
+          <span class="brand-title">InfeRail <em class="ai-pill">AI</em></span>
+          <span class="brand-sub">INTELLIGENT INSPECTION</span>
+        </div>
+      </a>
+
+      <nav class="nav-links" id="navLinks">
+        <a href="#home" class="nav-a active">Home</a>
+        <a href="#inspectionStation" class="nav-a">Inspection Station</a>
+        <a href="#architecture" class="nav-a">Architecture</a>
+      </nav>
+
+      <div class="nav-right">
+        <a class="btn btn-ghost" id="btnGithub" href="https://github.com/aryasdead/Inferail" target="_blank" rel="noopener noreferrer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <section class="hero" id="home">
+      <div class="hero-inner">
+
+        <!-- Left: Text and CTA -->
+        <div class="hero-left">
+          <div class="side-hud-ticks" aria-hidden="true">
+            <span></span><span class="tick-accent"></span><span></span><span></span><span class="tick-accent"></span>
+          </div>
+
+          <div class="hero-headline-group">
+            <div class="giant-track">
+              <h1>InfeRail</h1>
+              <div class="scan-sweep"></div>
+            </div>
+            <p class="intelligence-label">INTELLIGENT, DATA-DRIVEN INSIGHTS</p>
+            <h2 class="hero-sub">
+              <span class="hl-yellow">Automate Your</span><br>Railway Inspection
+            </h2>
+          </div>
+
+          <p class="hero-desc">
+            InfeRail uses <strong>YOLOv8 + ResNet-18</strong> computer vision with <strong>CLAHE preprocessing</strong> to detect track defects, estimate severity, and visualize health trends on a real-time Streamlit dashboard.
+          </p>
+
+          <div class="hero-btns">
+            <a class="btn btn-yellow btn-lg" id="btnExploreDash" href="#inspectionStation">
+              <span>Explore Inspection Station</span>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3.3 8H12.7M12.7 8L8 3.3M12.7 8L8 12.7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Right: Modern AI Inspection Console / Telemetry Station -->
+        <div class="hero-right">
+          <div class="inspection-console" id="heroRight">
+
+            <!-- Console Header Bar -->
+            <div class="console-hdr">
+              <div class="console-hdr-left">
+                <span class="pulse-green"></span>
+                <span class="console-title">INSPECTION FEED · CAM-01 [ACTIVE]</span>
+              </div>
+              <div class="console-hdr-right">
+                <span class="chip-tech">YOLOv8n + RESNET-18</span>
+                <span class="chip-clahe">CLAHE ACTIVE</span>
+              </div>
+            </div>
+
+            <!-- Viewport Stage -->
+            <div class="console-stage">
+              <!-- Active detection image -->
+              <img src="images/annotated_user_track.jpg"
+                   alt="InfeRail Real-time Rail Defect Detection"
+                   class="hero-main-img" id="heroImg">
+
+              <!-- Scanning laser effect -->
+              <div class="laser-scanner" aria-hidden="true"></div>
+
+              <!-- Optical crosshair overlay -->
+              <div class="optical-reticle" aria-hidden="true">
+                <div class="reticle-ring"></div>
+                <div class="reticle-cross"></div>
+              </div>
+
+              <!-- Telemetry HUD Card -->
+              <div class="hud-card telemetry-hud">
+                <div class="hud-header">
+                  <span class="hud-led"></span> AUTONOMOUS TELEMETRY
+                </div>
+                <svg viewBox="0 0 100 28" class="spark-svg">
+                  <path d="M0,20 Q12,4 25,16 T55,8 T80,18 T100,6" fill="none" stroke="#00F0FF" stroke-width="2"/>
+                  <path d="M0,20 Q12,4 25,16 T55,8 T80,18 T100,6 L100,28 L0,28Z" fill="rgba(0,240,255,0.18)"/>
+                </svg>
+                <div class="hud-metrics">
+                  <div><span class="hm-s">SPEED</span><span class="hm-v text-cyan">164 KM/H</span></div>
+                  <div><span class="hm-s">CONF</span><span class="hm-v text-yellow" id="liveConf">99.8%</span></div>
+                  <div><span class="hm-s">FPS</span><span class="hm-v text-cyan">~30</span></div>
+                </div>
+              </div>
+
+              <!-- Live Defect Badges -->
+              <div class="defect-badge-cluster">
+                <div class="defect-tag tag-cyan" id="dTag1">
+                  <span class="blink-dot"></span>
+                  <div>
+                    <div class="dt-title">CRACK DETECTED</div>
+                    <div class="dt-body">crack · 89.0% conf · Severity 4</div>
+                  </div>
+                </div>
+                <div class="defect-tag tag-amber" id="dTag2">
+                  <span class="amber-dot"></span>
+                  <div>
+                    <div class="dt-title">JOINT DEFECT DETECTED</div>
+                    <div class="dt-body">joint_defect · 78.0% · Severity 3</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mode Toolbar -->
+              <div class="mode-toolbar">
+                <button class="mode-btn active" data-img="images/annotated_user_track.jpg">AI Detections</button>
+                <button class="mode-btn" data-img="images/side_by_side_user_track.jpg">Side-by-Side</button>
+                <button class="mode-btn" data-img="images/enhanced.jpg">CLAHE Enhanced</button>
+                <button class="mode-btn" data-img="images/track_sample_crack_shadow.jpg">Crack+Shadow</button>
+                <span class="live-tag-pill"><span class="pulse-red"></span> LIVE STREAM</span>
+              </div>
+
+            </div>
+
+            <!-- Console Footer Status -->
+            <div class="console-ftr">
+              <span>GPS: 28°36'48.2"N 77°12'24.8"E</span>
+              <span>TRACK ID: DL-NDLS-SEC-04</span>
+              <span>BUFFER: 0.12s</span>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <div class="fullwidth-ticker-banner" aria-hidden="true">
+      <div class="ticker-track" id="ribbonTrack">
+        <span>⚏⚏⚏ Automated Rail Inspection // Computer Vision Telemetry // InfeRail AI</span>
+        <span>⚏⚏⚏ YOLOv8 Detection · ResNet-18 Classification · CLAHE Preprocessing · SQLite Telemetry · Streamlit ⚏⚏⚏</span>
+        <span>⚏⚏⚏ 22 Pytest Verification Passes · Zero White Border Defects · Autonomous Real-Time Monitoring</span>
+        <span>⚏⚏⚏ Automated Rail Inspection // Computer Vision Telemetry // InfeRail AI</span>
+        <span>⚏⚏⚏ YOLOv8 Detection · ResNet-18 Classification · CLAHE Preprocessing · SQLite Telemetry · Streamlit ⚏⚏⚏</span>
+        <span>⚏⚏⚏ 22 Pytest Verification Passes · Zero White Border Defects · Autonomous Real-Time Monitoring</span>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         IMAGE UPLOAD & PIPELINE LAUNCH STATION
+    ═══════════════════════════════════════════════ -->
+    <section class="section upload-section" id="inspectionStation">
+      <div class="section-wrap">
+        <div class="glass-card upload-station-card">
+          <div class="upload-station-hdr">
+            <div class="hdr-tag-group">
+              <span class="sec-badge">INSPECTION WORKSTATION · ACTIVE PIPELINE</span>
+              <span class="pipeline-status-badge" id="pipelineLiveBadge"><span class="pulse-green"></span> SYSTEM READY</span>
+            </div>
+            <h2 class="upload-title">Autonomous Rail Image Ingestion & Analysis</h2>
+            <p class="upload-sub">Upload railway track imagery (JPG/PNG) to execute end-to-end CLAHE illumination enhancement, bilateral filtering, YOLOv8 feature extraction, and prioritized defect detection.</p>
+          </div>
+
+          <div class="upload-workspace-centered">
+            <!-- Centered Upload Dropzone / Preview Stage -->
+            <div class="dropzone-box" id="dropzoneBox">
+              <input type="file" id="trackFileInput" accept="image/*" class="visually-hidden">
+              
+              <div class="dropzone-empty-state" id="dropzoneEmpty">
+                <div class="dz-icon-wrap">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                </div>
+                <div class="dz-text-main">Drop rail track image here or <span class="highlight-browse">browse files</span></div>
+                <div class="dz-text-sub">Supports JPEG, PNG, WEBP (Max 25MB · Optimal: 1920×1080 or 4K Track Cam)</div>
+                
+                <div class="sample-preset-row">
+                  <span class="preset-label">Or load sample:</span>
+                  <button type="button" class="btn-sample-preset" data-preset="images/track_sample_crack_shadow.jpg">Crack + Shadow</button>
+                  <button type="button" class="btn-sample-preset" data-preset="images/track_sample_missing_fastener.jpg">Missing Fastener</button>
+                  <button type="button" class="btn-sample-preset" data-preset="images/user_track_input.jpg">Track Cam #01</button>
+                </div>
+              </div>
+
+              <div class="dropzone-preview-state" id="dropzonePreview" style="display: none;">
+                <div class="preview-canvas-wrapper">
+                  <img id="uploadedImagePreview" alt="Track inspection target">
+                  <canvas id="detectionCanvasOverlay"></canvas>
+                  <div class="scan-laser-bar" id="scanLaserBar"></div>
+                </div>
+                <div class="preview-action-bar">
+                  <div class="file-meta-pill" id="fileMetaPill">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    <span id="fileNameLabel">image.jpg</span> · <span id="fileDimLabel">1920×1080</span>
+                  </div>
+                  <button type="button" class="btn-dz-clear" id="btnClearImage">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    Change Image
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Launch Control Bar -->
+            <div class="launch-control-bar">
+              <button type="button" class="btn btn-yellow btn-launch-program" id="btnRunProgram">
+                <span class="launch-icon-glow">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                </span>
+                <span class="btn-text-primary">LAUNCH FULL PIPELINE</span>
+              </button>
+              <div class="launch-meta-hint">
+                <span class="status-indicator-dot"></span>
+                <span id="launchSubtext">Ready to run complete CV preprocessing, inference & defect telemetry</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ═══════════════════════════════════════════════
+         ARCHITECTURE / SYSTEM OVERVIEW
+    ═══════════════════════════════════════════════ -->
+    <section class="section arch-section" id="architecture">
+      <div class="section-wrap">
+        <!-- Priority Tier Table from severity.py spec -->
+        <div class="priority-table-card glass-card">
+          <div class="ptc-header">
+            <span class="sec-badge">PRIORITIZATION/SEVERITY.PY</span>
+            <span>Rule-Based Priority Tiers</span>
+          </div>
+          <table class="priority-table">
+            <thead>
+              <tr>
+                <th>TIER</th>
+                <th>LABEL</th>
+                <th>DEFECT TYPES</th>
+                <th>RESPONSE</th>
+                <th>CLASS COLOR</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="tier-critical">
+                <td><code>T1</code></td>
+                <td><span class="badge badge-crit">CRITICAL</span></td>
+                <td>Broken Rail, Multiple Consecutive Missing Fasteners</td>
+                <td>Immediate derailment risk — halt operations</td>
+                <td><span class="color-swatch" style="background:#D600FF"></span> Magenta</td>
+              </tr>
+              <tr class="tier-high">
+                <td><code>T2</code></td>
+                <td><span class="badge badge-high">HIGH</span></td>
+                <td>Wide Surface Crack, Broken Fishplate, Joint Defect</td>
+                <td>Rapid maintenance dispatch within 24h</td>
+                <td><span class="color-swatch" style="background:#FF2A4D"></span> Crimson</td>
+              </tr>
+              <tr class="tier-medium">
+                <td><code>T3</code></td>
+                <td><span class="badge badge-med">MEDIUM</span></td>
+                <td>Minor Spalling, Light Surface Wear, Missing 1 Fastener</td>
+                <td>Scheduled inspection within 1 week</td>
+                <td><span class="color-swatch" style="background:#FFAA00"></span> Amber</td>
+              </tr>
+              <tr class="tier-low">
+                <td><code>T4</code></td>
+                <td><span class="badge badge-low">MONITOR</span></td>
+                <td>Cosmetic Rust, Superficial Surface Flaw</td>
+                <td>Monitor — log for trend analysis</td>
+                <td><span class="color-swatch" style="background:#00D4FF"></span> Cyan</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="ptc-note">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Confidence score ≠ Severity. A high-confidence (99%) minor scratch is still classified as LOW/MONITOR.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="section-wrap">
+        <div class="cta-inner glass-card">
+          <div class="cta-text-block">
+            <h2>Ready to Launch InfeRail?</h2>
+          </div>
+          <div class="cta-btns">
+            <a class="btn btn-ghost" href="https://github.com/aryasdead/Inferail">View on GitHub</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <span class="brand-title" style="font-size:1.2rem">InfeRail <em class="ai-pill">AI</em></span>
+        <p>YOLOv8 + ResNet-18 Railway Defect Detection System</p>
+        <p style="margin-top:.35rem;font-size:.78rem;color:#42556B">Built with Python · OpenCV · Albumentations · SQLite · Streamlit · Pytest</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 InfeRail Project Team · Academic Prototype · Railway Safety Boundaries Apply</span>
+      <span>22 pytest tests · 6.76s · 100% pass rate</span>
+    </div>
+  </footer>
+
+  <!-- Anomaly Inject Modal -->
+  <div class="modal-bg" id="modalBg">
+    <div class="modal-box">
+      <button class="modal-x" id="modalX">&times;</button>
+      <div class="modal-hdr">
+        <span class="hud-led"></span>
+        <h3 id="modalH">New Defect Injected</h3>
+      </div>
+      <div id="modalBody">
+        <p>A new simulated defect has been added to the registry and would be persisted to the SQLite <code>defects</code> table via <code>save_inspection_record()</code>.</p>
+        <div class="modal-code" id="modalCodeBlock"></div>
+      </div>
+      <button class="btn btn-yellow" style="width:100%;margin-top:1.2rem" onclick="document.getElementById('modalBg').classList.remove('open')">Dismiss</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
