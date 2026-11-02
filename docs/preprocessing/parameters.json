@@ -1,0 +1,60 @@
+{
+  "pipeline_name": "InfeRail_Track_Preprocessing",
+  "version": "1.0.0",
+  "author": "Team 1: Preprocessing & Computer Vision Lead",
+  "input_validation": {
+    "supported_extensions": [".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"],
+    "target_color_space": "RGB",
+    "min_height": 10,
+    "min_width": 10,
+    "enforce_uint8": true
+  },
+  "clahe": {
+    "enabled": true,
+    "color_space": "LAB",
+    "clip_limit": 2.5,
+    "tile_grid_size": [8, 8],
+    "target_channel": "L (Lightness)"
+  },
+  "denoising": {
+    "enabled": true,
+    "method": "bilateral",
+    "bilateral_parameters": {
+      "d": 7,
+      "sigma_color": 50.0,
+      "sigma_space": 50.0
+    },
+    "gaussian_fallback": {
+      "ksize": 3,
+      "sigma_x": 0
+    }
+  },
+  "letterbox": {
+    "target_size": [640, 640],
+    "pad_color": [114, 114, 114],
+    "auto": false,
+    "scale_fill": false,
+    "scale_up": true,
+    "stride": 32
+  },
+  "normalization": {
+    "dtype": "float32",
+    "scale_factor": 255.0,
+    "channel_order": "CHW",
+    "batch_dimension": true,
+    "output_tensor_shape": [1, 3, 640, 640]
+  },
+  "augmentations": {
+    "horizontal_flip_p": 0.5,
+    "brightness_contrast_p": 0.6,
+    "brightness_limit": 0.2,
+    "contrast_limit": 0.2,
+    "motion_blur_p": 0.3,
+    "motion_blur_limit": 5,
+    "clahe_p": 0.4,
+    "shift_scale_rotate_p": 0.4,
+    "rotate_limit_deg": 10,
+    "scale_limit_pct": 0.1,
+    "shift_limit_pct": 0.05
+  }
+}

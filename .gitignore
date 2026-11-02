@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# YOLO & Model Weights — excluded from repo (too large for GitHub)
+*.pt
+*.pth
+*.onnx
+runs/
+.ultralytics/
+
+# Project temporary storage
+uploads/
+outputs/
+*.sqlite
+*.db
+
+# OS / Editor specific
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
